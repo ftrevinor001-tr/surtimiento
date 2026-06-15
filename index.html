@@ -106,11 +106,14 @@
   ::-webkit-scrollbar-thumb{background:#2a323e;border-radius:5px;border:2px solid var(--panel)}
   ::-webkit-scrollbar-track{background:transparent}
 </style>
+<!-- Archivo de datos generado por el convertidor. Si no existe, la app entra en MODO DEMO.
+     onerror evita que la consola marque error cuando el archivo aún no se ha subido. -->
+<script src="datos_surtimiento.js" onerror="window.__sinDatos=true"></script>
 </head>
 <body>
 <header>
   <div class="logo"><span class="dot"></span>Surtimiento<small>análisis de compra</small></div>
-  <div class="data-status"><span class="pulse"></span>Datos al 11 jun 2026 · SANVER + Más Ferre</div>
+  <div class="data-status" id="data-status"><span class="pulse"></span><span id="data-status-txt">—</span></div>
 </header>
 
 <div class="shell">
@@ -248,8 +251,29 @@ function buildOne(id){
     ventaMF:Math.round(base*(0.4+rnd()*0.5)),    // venta mensual de sucursales
   };
 }
+// ----- fuente de datos -----
+// Si existe window.DATOS_SURTIMIENTO (generado por el convertidor), se usan los datos REALES.
+// Si no, la app entra en MODO DEMO y genera datos simulados para que se pueda probar.
+const DEMO = !(window.DATOS_SURTIMIENTO && Array.isArray(window.DATOS_SURTIMIENTO.claves) && window.DATOS_SURTIMIENTO.claves.length);
+const REAL_INDEX = {};
+if(!DEMO){
+  window.DATOS_SURTIMIENTO.claves.forEach(r=>{ REAL_INDEX[String(r.id).toUpperCase()] = r; });
+}
 const POOL={};
-function getRow(id){if(!POOL[id])POOL[id]=buildOne(id);return POOL[id];}
+function getRow(id){
+  const key=String(id).toUpperCase();
+  if(!DEMO){
+    // datos reales: devuelve la clave si existe; si no, null (no se inventa nada)
+    const r=REAL_INDEX[key];
+    if(!r) return null;
+    // conservar override manual del comprador entre renders
+    if(POOL[key] && POOL[key].override!=null) r.override=POOL[key].override;
+    POOL[key]=r;
+    return r;
+  }
+  if(!POOL[key])POOL[key]=buildOne(key);
+  return POOL[key];
+}
 
 // demanda mensual según base y periodo.
 //  hist tiene 13 valores: índice 0 = mismo mes hace un año (ej. jun-2025),
@@ -317,9 +341,16 @@ const S={base:'pron',periodo:3,bo:true,mf:true,redondeo:true,search:'',
   sort:{key:'mesesSV',dir:1},lista:[]};
 function params(){return{base:S.base,periodo:S.periodo,bo:S.bo,mf:S.mf,redondeo:S.redondeo};}
 
+let NO_ENCONTRADAS=[];
 function rows(){
-  let R=S.lista.map(id=>{const r=getRow(id);return{r,c:calcular(r,params())};});
-  if(S.search){const q=S.search.toLowerCase();R=R.filter(x=>x.r.id.toLowerCase().includes(q)||x.r.desc.toLowerCase().includes(q));}
+  NO_ENCONTRADAS=[];
+  let R=[];
+  S.lista.forEach(id=>{
+    const r=getRow(id);
+    if(!r){ NO_ENCONTRADAS.push(String(id).toUpperCase()); return; }
+    R.push({r,c:calcular(r,params())});
+  });
+  if(S.search){const q=S.search.toLowerCase();R=R.filter(x=>x.r.id.toLowerCase().includes(q)||(x.r.desc||'').toLowerCase().includes(q));}
   const k=S.sort.key,d=S.sort.dir;
   R.sort((a,b)=>{
     let va,vb;
@@ -381,7 +412,14 @@ function render(){
     <div class="kpi"><div class="label">Bajo punto reorden</div><div class="num" style="color:var(--bad)">${fmt(criticas)}</div><div class="sub">meses inv &lt; tiempo entrega</div></div>
     <div class="kpi"><div class="label">Piezas sugeridas</div><div class="num buy">${fmt(totSug)}</div><div class="sub">CEDI + faltante Más Ferre</div></div>
     <div class="kpi"><div class="label">Inversión estimada</div><div class="num inv">${money(totInv)}</div><div class="sub">a costo unitario</div></div>`;
-  document.getElementById('count').textContent=`${fmt(R.length)} claves`;
+  const cnt=document.getElementById('count');
+  if(NO_ENCONTRADAS.length){
+    cnt.innerHTML=`${fmt(R.length)} claves · <span style="color:var(--warn)">${NO_ENCONTRADAS.length} no encontrada(s)</span>`;
+    cnt.title='Sin datos para: '+NO_ENCONTRADAS.join(', ');
+  } else {
+    cnt.textContent=`${fmt(R.length)} claves`;
+    cnt.title='';
+  }
   // body
   document.getElementById('body').innerHTML=R.map(x=>{
     const r=x.r,c=x.c;
@@ -514,6 +552,20 @@ document.getElementById('btn-pedido').onclick=()=>{
   const R=rows().filter(x=>x.c.sugerido>0);
   alert(`Pedido:\n${R.length} claves · ${fmt(R.reduce((a,x)=>a+x.c.sugerido,0))} pz\nInversión: ${money(R.reduce((a,x)=>a+x.c.inversion,0))}\n\n(En producción esto generaría el layout de compra o la orden en el ERP.)`);
 };
+// ----- indicador de estado de datos -----
+(function initStatus(){
+  const txt=document.getElementById('data-status-txt');
+  const dot=document.querySelector('#data-status .pulse');
+  if(DEMO){
+    txt.textContent='MODO DEMO · datos simulados (no hay archivo de datos cargado)';
+    dot.style.background='var(--warn)';
+    document.getElementById('data-status').title='No se encontró datos_surtimiento.js. La app muestra datos de ejemplo.';
+  } else {
+    const d=window.DATOS_SURTIMIENTO;
+    txt.textContent='Datos al '+(d.fecha||'—')+' · '+d.claves.length.toLocaleString('es-MX')+' claves · SANVER + Más Ferre';
+    dot.style.background='var(--good)';
+  }
+})();
 renderHead();render();
 </script>
 </body>
