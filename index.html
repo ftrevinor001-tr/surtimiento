@@ -327,8 +327,11 @@ function calcular(r,P){
   let sugerido = (P.redondeo&&r.empaque>1) ? Math.ceil(necesidad/r.empaque)*r.empaque : Math.round(necesidad);
   if(r.override!=null) sugerido=r.override;
   // --- proyección: meses de inventario si llega el pedido ---
-  // disponible tras recibir el pedido y cubrir BO y faltante de sucursales
-  const dispSVproj = dispSV + sugerido - boSV - faltaMF;
+  // Pregunta: cuando llegue el pedido, ¿cuántos meses de inventario tendré?
+  // = (lo que tengo disponible + lo que compro) / demanda mensual.
+  // El BO y el faltante de MF NO se restan aquí: son salidas normales ya contempladas
+  // en la demanda; restarlos contaría doble y volvería negativa la proyección.
+  const dispSVproj = dispSV + sugerido;
   const mesesSVproj = demandaMes>0 ? dispSVproj/demandaMes : (dispSVproj>0?99:0);
   const existMFproj = r.existMF + faltaMF;
   const mesesMFproj = r.ventaMF>0 ? existMFproj/r.ventaMF : (existMFproj>0?99:0);
