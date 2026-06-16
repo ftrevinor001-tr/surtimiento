@@ -163,16 +163,18 @@ function handle(text){
     // Pronóstico: mismos `dias` días pero hace un año -> empieza en día (365 - dias) hacia adelante,
     //   es decir el mismo tramo estacional del año pasado. Aproximación con el bloque de 365:
     //   pronóstico = días [365-dias, 365) si hay 365; si no, se reutiliza el disponible.
+    // venta total del AÑO (365 días) — el Pron usa el promedio mensual anual (validado vs Excel)
+    const ventaAnual=sumaDias(venta,0,venta.length);
     const cortes={};
     for(const p in PERIODOS){
       const d=PERIODOS[p];
       const antVenta=sumaDias(venta,0,d);
       const antExtra=sumaDias(dev,0,d)+sumaDias(aju,0,d)+sumaDias(ins,0,d)+sumaDias(tra,0,d);
-      // pronóstico: mismo periodo, un año atrás. Inicio = (365 - d) si cabe, sino 0.
       const ini=Math.max(0, venta.length - d);
       const proVenta=sumaDias(venta,ini,d);
       const proExtra=sumaDias(dev,ini,d)+sumaDias(aju,ini,d)+sumaDias(ins,ini,d)+sumaDias(tra,ini,d);
-      cortes[p]={av:antVenta,ax:antExtra,pv:proVenta,px:proExtra};
+      // pAnual = venta del año completo (para el Pron). av = tramo reciente (para el Antec).
+      cortes[p]={av:antVenta,ax:antExtra,pv:proVenta,px:proExtra,pAnual:ventaAnual};
     }
     // venta del mes en curso (para Meses Inv Acumulado): suma de los días transcurridos del mes
     const diasTransc=parseInt(document.getElementById('dias-transc').value)||14;
