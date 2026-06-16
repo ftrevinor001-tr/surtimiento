@@ -269,7 +269,12 @@ function buildOne(id){
 const DEMO = !(window.DATOS_SURTIMIENTO && Array.isArray(window.DATOS_SURTIMIENTO.claves) && window.DATOS_SURTIMIENTO.claves.length);
 const REAL_INDEX = {};
 const DIAS_TRANSC = (!DEMO && window.DATOS_SURTIMIENTO.diasTransc) ? window.DATOS_SURTIMIENTO.diasTransc : 14;
+// detectar si el archivo de datos es del formato NUEVO (con cortes + pAnual)
+let FORMATO_OK = true;
 if(!DEMO){
+  const muestra = window.DATOS_SURTIMIENTO.claves[0];
+  const corte0 = muestra && muestra.cortes ? (muestra.cortes['5']||muestra.cortes['3']||Object.values(muestra.cortes)[0]) : null;
+  FORMATO_OK = !!(corte0 && ('pAnual' in corte0));
   window.DATOS_SURTIMIENTO.claves.forEach(r=>{ if(r.diasTransc==null) r.diasTransc=DIAS_TRANSC; REAL_INDEX[String(r.id).toUpperCase()] = r; });
 }
 const POOL={};
@@ -613,6 +618,10 @@ document.getElementById('btn-pedido').onclick=()=>{
     txt.textContent='MODO DEMO · datos simulados (no hay archivo de datos cargado)';
     dot.style.background='var(--warn)';
     document.getElementById('data-status').title='No se encontró datos_surtimiento.js. La app muestra datos de ejemplo.';
+  } else if(!FORMATO_OK){
+    txt.textContent='⚠ Archivo de datos en formato ANTIGUO · regenéralo con el convertidor nuevo';
+    dot.style.background='var(--bad)';
+    document.getElementById('data-status').title='El datos_surtimiento.js fue generado con un convertidor viejo (sin ventas diarias). Vuelve a generarlo con convertidor_v2.html para que el cálculo de Pron/Antec sea correcto.';
   } else {
     const d=window.DATOS_SURTIMIENTO;
     txt.textContent='Datos al '+(d.fecha||'—')+' · '+d.claves.length.toLocaleString('es-MX')+' claves · SANVER + Más Ferre';
