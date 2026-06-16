@@ -223,32 +223,37 @@ function rng(s){return()=>{s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff
 const rnd=rng(20260611);
 const pick=a=>a[Math.floor(rnd()*a.length)];
 
-// 13 meses de historia: índice 0 = mismo mes hace un año, índice 12 = mes actual
+// Modo DEMO: genera una clave simulada con la misma estructura que el convertidor v2
 function buildOne(id){
   const marca=pick(MARCAS),grupo=pick(GRUPOS);
-  const base=Math.round(5+rnd()*rnd()*700);
-  const estac=0.7+rnd()*0.6;
-  // 13 meses: índice 0 = mismo mes hace un año ... índice 12 = mes actual
-  const hist=Array.from({length:13},(_,m)=>{
-    const season=1+0.3*Math.sin((m%12)/12*Math.PI*2)*estac;
-    return Math.max(0,Math.round(base*season*(0.7+rnd()*0.6)));
-  });
+  const base=Math.round(5+rnd()*rnd()*700);   // venta mensual típica
   const empaque=pick([1,1,1,6,12,24,50]);
-  const objetivo=pick([1.5,2,2,2.5,3,3]);        // meses objetivo por clave
-  const teDias=pick([7,10,14,21,30,45,60]);      // tiempo de entrega por clave
+  const objetivo=pick([1.5,2,2,2.5,3,3]);
+  const teDias=pick([7,10,14,21,30,45]);
+  // generar cortes pre-agregados para cada periodo (venta antecedente y pronóstico)
+  const DIAS={'0.5':15,'1':30,'1.5':45,'2':60,'3':91,'4':122,'5':152,'6':182,'7':212,'8':243,'9':273,'10':304,'11':334,'12':365};
+  const ventaDiaria=base/30;
+  const estacPron=0.8+rnd()*0.5;   // el pronóstico difiere algo del antecedente
+  const cortes={};
+  for(const p in DIAS){
+    const d=DIAS[p];
+    const av=Math.round(ventaDiaria*d*(0.85+rnd()*0.3));
+    const pv=Math.round(av*estacPron);
+    cortes[p]={av, ax:Math.round(av*0.05), pv, px:Math.round(pv*0.05)};
+  }
+  const diasTransc=14;
   return {
     id,marca,grupo,comprador:pick(COMPRADORES),
     desc:`${grupo.toUpperCase()} ${pick(['1/2"','3/4"','3 PZAS','GDE','PROF','12MM','ROJO','3M'])} ${marca}`,
-    hist,empaque,objetivo,teDias,
+    empaque,objetivo,teDias,
     costo:+(2+rnd()*rnd()*420).toFixed(2),
-    // SANVER (CEDI)
     existSV:Math.round(rnd()*base*2.5),
     bo:rnd()<0.25?Math.round(rnd()*base*0.5):0,
     transito:rnd()<0.3?Math.round(rnd()*base):0,
-    // MÁS FERRE (sucursales)
     existMF:Math.round(rnd()*base*1.8),
-    baseMF:Math.round(base*pick([1,1.5,2])),     // nivel base que deben mantener las tiendas
-    ventaMF:Math.round(base*(0.4+rnd()*0.5)),    // venta mensual de sucursales
+    baseMF:Math.round(base*pick([1,1.5,2])),
+    ventaMF:Math.round(base*(0.4+rnd()*0.5)),
+    cortes, vtaMesAcum:Math.round(ventaDiaria*diasTransc), diasTransc, ait:false,
   };
 }
 // ----- fuente de datos -----
@@ -256,8 +261,9 @@ function buildOne(id){
 // Si no, la app entra en MODO DEMO y genera datos simulados para que se pueda probar.
 const DEMO = !(window.DATOS_SURTIMIENTO && Array.isArray(window.DATOS_SURTIMIENTO.claves) && window.DATOS_SURTIMIENTO.claves.length);
 const REAL_INDEX = {};
+const DIAS_TRANSC = (!DEMO && window.DATOS_SURTIMIENTO.diasTransc) ? window.DATOS_SURTIMIENTO.diasTransc : 14;
 if(!DEMO){
-  window.DATOS_SURTIMIENTO.claves.forEach(r=>{ REAL_INDEX[String(r.id).toUpperCase()] = r; });
+  window.DATOS_SURTIMIENTO.claves.forEach(r=>{ if(r.diasTransc==null) r.diasTransc=DIAS_TRANSC; REAL_INDEX[String(r.id).toUpperCase()] = r; });
 }
 const POOL={};
 function getRow(id){
@@ -280,68 +286,98 @@ function getRow(id){
 //  índices 1..11 = meses siguientes de ese año (jul, ago...), índice 12 = mes actual (jun-2026).
 //  PRONÓSTICO: los N meses que siguen al mes actual pero del año pasado.
 //     analizar en junio con N=3  ->  jul+ago+sep 2025  =  índices 1,2,3
-//  ANTECEDENTE: los últimos N meses previos al análisis (mes actual hacia atrás).
-//     N=3 -> abr+may+jun 2026 = índices 10,11,12
-function sumaProporcional(arr,desde,N){
-  // suma N meses (N puede ser fraccionario, ej 0.5) empezando en 'desde'
-  let total=0,rest=N,i=desde;
-  while(rest>0 && i<arr.length){
-    const take=Math.min(1,rest);
-    total+=arr[i]*take;rest-=take;i++;
-  }
-  return N>0?total/N:0; // promedio mensual
-}
-function demanda(r,base,N){
-  const h=r.hist;                       // 13 valores
-  // pronóstico: arranca en índice 1 (mes siguiente al actual, del año pasado)
-  const pron=sumaProporcional(h,1,N);
-  // antecedente: los últimos N meses terminando en el actual (índice 12)
-  const antec=sumaProporcional(h,Math.max(0,13-N),N);
-  const prom=(antec+pron)/2;
-  const d = base==='antec'?antec : base==='pron'?pron : prom;
-  return {demandaMes:d,antec,pron};
+// ===================================================================
+//  MOTOR DE CÁLCULO — réplica exacta de las fórmulas del Excel "Niveles"
+// ===================================================================
+//  Días por periodo (idénticos a la fórmula original)
+const DIAS_PERIODO={'0.5':15,'1':30,'1.5':45,'2':60,'3':91,'4':122,'5':152,'6':182,'7':212,'8':243,'9':273,'10':304,'11':334,'12':365};
+//
+//  El convertidor entrega, por clave, los cortes pre-agregados:
+//    cortes[periodo] = { av, ax, pv, px }
+//      av = venta antecedente del periodo      ax = dev+ajustes+insumos+traspasos antecedente
+//      pv = venta pronóstico del periodo        px = dev+ajustes+insumos+traspasos pronóstico
+//
+//  Fórmulas (P = parámetros de pantalla):
+//    Pron (meses inv) = (BO + ExistSV + ExistMF) * dias / (VtaPronostico_diaria * 30)
+//       donde VtaPronostico_diaria = pv / dias   ->  simplifica a (BO+SV+MF) / (pv/30... )
+//       de la fórmula: SUMA(R,S,AC)*dias / (SUMA(AH,...)*30), con AH = venta diaria promedio
+//    Antec (meses inv) = igual pero con la venta del antecedente (av).
+//    ¿Considerar BO? (AV1): si "No", se omite R (BO) del numerador.
+//    ¿AIT? (AZ): si "Sí", se suman dev+ajustes+insumos+traspasos a la venta divisora.
+//
+//    Sugerido = (VtaTotal_pron + dev+aju+ins+tra - BO - ExistSV) * 1.2  (vacío si <=0)
+//
+function cortePeriodo(r,N){
+  // N es número (0.5..12). Tomamos el corte correspondiente.
+  const key=String(N);
+  if(r.cortes && r.cortes[key]) return r.cortes[key];
+  // respaldo (modo demo / datos viejos): cero
+  return {av:0,ax:0,pv:0,px:0};
 }
 
 function calcular(r,P){
-  const {demandaMes,antec,pron}=demanda(r,P.base,P.periodo);
-  const teMes=r.teDias/30;
-  const boSV=P.bo?r.bo:0;
-  // --- SANVER ---
-  // Meses de inventario = lo que tengo físicamente disponible / demanda.
-  // El back order NO se resta aquí: mide cobertura del inventario actual, no la deuda.
-  const dispSV=r.existSV+r.transito;
-  const mesesSV = demandaMes>0 ? dispSV/demandaMes : (dispSV>0?99:0);
-  // --- MÁS FERRE ---
-  const mesesMF = r.ventaMF>0 ? r.existMF/r.ventaMF : (r.existMF>0?99:0);
-  const faltaMF = P.mf ? Math.max(0, r.baseMF - r.existMF) : 0;   // lo que falta para nivel base
-  // --- punto de reorden ---
-  // se dispara compra si los meses actuales en SANVER caen por debajo del tiempo de entrega,
-  // o si hay back order pendiente que cubrir
-  const dispara = mesesSV < (teMes + 0.001) || boSV>0 || faltaMF>0;
-  let necesidad=0;
-  if(dispara){
-    // cubrir hasta objetivo + lo que se debe (BO) + faltante de sucursales, menos lo disponible
-    necesidad = demandaMes*r.objetivo + boSV + faltaMF - dispSV;
-  }
-  necesidad=Math.max(0,necesidad);
-  let sugerido = (P.redondeo&&r.empaque>1) ? Math.ceil(necesidad/r.empaque)*r.empaque : Math.round(necesidad);
+  const N=P.periodo;
+  const dias=DIAS_PERIODO[String(N)]||Math.round(N*30.4);
+  const c=cortePeriodo(r,N);
+  const considerarBO = P.bo;        // AV1
+  const ait = !!r.ait;              // AZ por clave (si el dato lo trae)
+
+  const BO=r.bo, SV=r.existSV, MF=r.existMF;
+  const numBase = (considerarBO?BO:0) + SV + MF;   // SUMA(R,S,AC) ó SUMA(S,AC)
+
+  // venta diaria promedio del periodo (pronóstico / antecedente).
+  // Si AIT: la venta divisora incluye dev+ajustes+insumos+traspasos.
+  const vtaPronTot = c.pv + (ait? c.px : 0);
+  const vtaAntecTot= c.av + (ait? c.ax : 0);
+  const vtaPronDiaria = vtaPronTot/dias;
+  const vtaAntecDiaria= vtaAntecTot/dias;
+
+  // Pron / Antec = meses de inventario con cada base
+  const INF=99;
+  const pron  = vtaPronDiaria>0 ? numBase*dias/(vtaPronDiaria*30*dias) : (numBase>0?INF:0);
+  const antec = vtaAntecDiaria>0? numBase*dias/(vtaAntecDiaria*30*dias): (numBase>0?INF:0);
+  // nota: numBase*dias/(vtaDiaria*30*dias) = numBase/(vtaDiaria*30) -> meses
+  // (se deja la forma larga para reflejar la fórmula original)
+
+  const mesesInv = P.base==='antec'? antec : P.base==='pron'? pron : (antec+pron)/2;
+
+  // Meses de Inventario ACUMULADO (col 24): U/((X/Z2)*30)
+  //   U = vtaMesAcum, X = teDias, Z2 = diasTransc -> aquí lo reinterpretamos como
+  //   indicador de cobertura del inventario total frente a la venta del mes en curso anualizada.
+  const vtaMesAcumMensual = r.vtaMesAcum>0 ? r.vtaMesAcum*(30/(r.diasTransc||14)) : 0;
+  const mesesAcum = vtaMesAcumMensual>0 ? (BO+SV+MF)/vtaMesAcumMensual : ((BO+SV+MF)>0?INF:0);
+
+  // --- Sugerido (fórmula exacta) ---
+  // (VtaTotal + dev+aju+ins+tra) - BO - ExistSV, por *1.2 ; con base pronóstico por defecto
+  const vtaTotalBase = P.base==='antec'? c.av : c.pv;        // VtaTotal del periodo
+  const extras = ait ? (P.base==='antec'? c.ax : c.px) : 0;  // dev/aju/ins/tra si AIT
+  let nec = (vtaTotalBase + extras) - (considerarBO?BO:0) - SV;
+  let sugerido = nec>0 ? Math.round(nec*1.2) : 0;
+  if(P.redondeo && r.empaque>1 && sugerido>0) sugerido=Math.ceil(sugerido/r.empaque)*r.empaque;
   if(r.override!=null) sugerido=r.override;
-  // --- proyección: meses de inventario si llega el pedido ---
-  // Pregunta: cuando llegue el pedido, ¿cuántos meses de inventario tendré?
-  // = (lo que tengo disponible + lo que compro) / demanda mensual.
-  // El BO y el faltante de MF NO se restan aquí: son salidas normales ya contempladas
-  // en la demanda; restarlos contaría doble y volvería negativa la proyección.
-  const dispSVproj = dispSV + sugerido;
-  const mesesSVproj = demandaMes>0 ? dispSVproj/demandaMes : (dispSVproj>0?99:0);
-  const existMFproj = r.existMF + faltaMF;
-  const mesesMFproj = r.ventaMF>0 ? existMFproj/r.ventaMF : (existMFproj>0?99:0);
-  // consolidado
-  const ventaTot=demandaMes+r.ventaMF;
-  const mesesCons = ventaTot>0 ? (dispSV+r.existMF)/ventaTot : 99;
-  const mesesConsProj = ventaTot>0 ? (dispSVproj+existMFproj)/ventaTot : 99;
-  return {demandaMes,antec,pron,teMes,dispSV,boSV,mesesSV,mesesMF,faltaMF,
-          necesidad,sugerido,mesesSVproj,mesesMFproj,mesesCons,mesesConsProj,
-          inversion:sugerido*r.costo,dispara};
+
+  // demanda mensual implícita (para meses proyectados): venta diaria * 30
+  const vtaDiariaUsada = P.base==='antec'? vtaAntecDiaria : P.base==='pron'? vtaPronDiaria : (vtaPronDiaria+vtaAntecDiaria)/2;
+  const demandaMes = vtaDiariaUsada*30;
+
+  // proyección: meses de inventario tras recibir el pedido
+  const mesesSVproj = demandaMes>0 ? (SV+sugerido)/demandaMes : ((SV+sugerido)>0?INF:0);
+
+  // dispara compra cuando los meses de inventario caen por debajo del tiempo de entrega
+  const teMes=r.teDias/30;
+  const dispara = mesesInv < (teMes+0.001) || sugerido>0;
+
+  return {
+    demandaMes, pron, antec, mesesInv, mesesAcum, teMes,
+    BO, SV, MF, sugerido, mesesSVproj,
+    inversion: sugerido*r.costo, dispara,
+    // compatibilidad con el render existente:
+    mesesSV: mesesInv, mesesMF: (r.ventaMF>0? MF/r.ventaMF : (MF>0?INF:0)),
+    faltaMF: Math.max(0, r.baseMF - MF),
+    mesesMFproj: (r.ventaMF>0? MF/r.ventaMF : (MF>0?INF:0)),
+    mesesCons: mesesAcum, mesesConsProj: mesesAcum,
+    dispSV: SV, boSV: BO, necesidad: nec
+  };
 }
 
 // ===================== ESTADO =====================

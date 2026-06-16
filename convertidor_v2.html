@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convertidor de datos · Surtimiento (cálculo exacto)</title>
+<style>
+  :root{--bg:#0f1115;--panel:#161a21;--panel2:#1c222b;--line:#262d38;--ink:#e7ecf3;--ink-dim:#9aa6b6;--ink-faint:#697585;--accent:#3ad29f;--accent-dim:#1c6e54;--bad:#f06363;--warn:#f0b429;--mono:ui-monospace,Menlo,Consolas,monospace;--sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;min-height:100vh;padding:40px 20px}
+  .wrap{max-width:720px;margin:0 auto}
+  h1{font-size:22px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+  h1 .dot{width:11px;height:11px;border-radius:3px;background:var(--accent)}
+  .lead{color:var(--ink-dim);margin:8px 0 28px}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:16px}
+  .step h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  .step h2 .n{width:22px;height:22px;border-radius:50%;background:var(--accent-dim);color:var(--ink);display:grid;place-items:center;font-size:12px;font-weight:700}
+  .step p{color:var(--ink-dim);font-size:13px;margin-bottom:14px}
+  .drop{border:2px dashed var(--line);border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:.15s;color:var(--ink-faint)}
+  .drop:hover,.drop.over{border-color:var(--accent-dim);background:var(--panel2);color:var(--ink-dim)}
+  .drop svg{opacity:.4;margin-bottom:10px}
+  .drop b{color:var(--ink-dim)}
+  .btn{background:var(--accent);color:#05231a;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);text-decoration:none;display:inline-block}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .log{font-family:var(--mono);font-size:12px;background:#0a0c10;border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:14px;max-height:280px;overflow:auto;white-space:pre-wrap;line-height:1.6}
+  .log .ok{color:var(--accent)}.log .err{color:var(--bad)}.log .warn{color:var(--warn)}.log .dim{color:var(--ink-faint)}
+  .hidden{display:none}
+  code{background:var(--panel2);padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:12px;color:var(--accent)}
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+  .scell{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px}
+  .scell .l{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint)}
+  .scell .v{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:3px}
+  .field{margin-top:12px}
+  .field label{display:block;font-size:12px;color:var(--ink-dim);margin-bottom:5px}
+  input[type=number],input[type=date]{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:8px 10px;font-size:13px;font-family:var(--mono);width:140px}
+  .note{font-size:12px;color:var(--ink-faint);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-top:12px;line-height:1.55}
+  table.fmt{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+  table.fmt th,table.fmt td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+  table.fmt th{color:var(--ink-faint);font-weight:600;font-size:11px;text-transform:uppercase}
+  table.fmt td{font-family:var(--mono);color:var(--ink-dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="dot"></span>Convertidor de datos · cálculo exacto</h1>
+  <p class="lead">Convierte tu export (ID + 365 ventas diarias + Dev/Ajustes/Insumos/Traspasos) en el archivo que lee la app, reproduciendo el cálculo del Excel original. Todo corre en tu navegador.</p>
+
+  <div class="step">
+    <h2><span class="n">1</span>Formato esperado del CSV</h2>
+    <p>Una fila por clave. Las columnas en este orden (los encabezados deben coincidir):</p>
+    <table class="fmt">
+      <tr><th>Columna</th><th>Contenido</th></tr>
+      <tr><td>CLAVE … VENTA_MENSUAL_MASFERRE</td><td>Igual que la plantilla base (16 columnas de identificación e inventario)</td></tr>
+      <tr><td>DIA_001 … DIA_365</td><td>365 ventas diarias. DIA_001 = día más reciente, DIA_365 = hace un año</td></tr>
+      <tr><td>DEV_001 … DEV_365</td><td>Devoluciones a Sanver por día (opcional, 0 si no aplica)</td></tr>
+      <tr><td>AJU_001 … AJU_365</td><td>Ajustes mabasa por día (opcional)</td></tr>
+      <tr><td>INS_001 … INS_365</td><td>Insumos por día (opcional)</td></tr>
+      <tr><td>TRA_001 … TRA_365</td><td>Traspasos por día (opcional)</td></tr>
+    </table>
+    <div class="note">Las matrices DEV/AJU/INS/TRA son opcionales: si no las incluyes, se toman como 0 y el sugerido se calcula solo con ventas. El día 1 es el más reciente; el pronóstico toma los mismos días del periodo pero contados desde hace un año (estacional).</div>
+  </div>
+
+  <div class="step">
+    <h2><span class="n">2</span>Parámetros del cálculo</h2>
+    <div class="row" style="gap:24px">
+      <div class="field">
+        <label>Días transcurridos del mes en curso</label>
+        <input type="number" id="dias-transc" value="14" min="1" max="31">
+      </div>
+      <div class="field">
+        <label>Fecha de los datos</label>
+        <input type="date" id="fecha-datos">
+      </div>
+    </div>
+    <div class="note">"Días transcurridos" corresponde a la celda Z2 de tu Excel (avance del mes actual). Se usa para anualizar la venta del mes en curso en el indicador de Meses de Inventario Acumulado.</div>
+  </div>
+
+  <div class="step">
+    <h2><span class="n">3</span>Carga el archivo</h2>
+    <div class="drop" id="drop">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      <div><b>Arrastra el CSV aquí</b> o haz clic para elegir</div>
+    </div>
+    <input type="file" id="file" accept=".csv,.txt" class="hidden">
+    <div id="summary" class="summary hidden"></div>
+    <div class="log hidden" id="log"></div>
+  </div>
+
+  <div class="step hidden" id="step4">
+    <h2><span class="n">4</span>Descarga</h2>
+    <p>Genera <code>datos_surtimiento.js</code> con los cortes pre-calculados. Súbelo junto a la app.</p>
+    <div class="row">
+      <button class="btn" id="btn-gen" disabled>Generar datos_surtimiento.js</button>
+      <a class="btn ghost hidden" id="btn-dl" download="datos_surtimiento.js">Descargar</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// Cortes de periodo que usa el cálculo (días por periodo, exactos como el Excel)
+const PERIODOS={'0.5':15,'1':30,'1.5':45,'2':60,'3':91,'4':122,'5':152,'6':182,'7':212,'8':243,'9':273,'10':304,'11':334,'12':365};
+const COLS_ID=["CLAVE","DESCRIPCION","MARCA","GRUPO","COMPRADOR","TIEMPO_ENTREGA_DIAS","MESES_OBJETIVO","PZS_EMPAQUE","COSTO_UNITARIO","EXIST_SANVER","BO_SANVER","TRANSITO_SANVER","EXIST_MASFERRE","BASE_MASFERRE","VENTA_MENSUAL_MASFERRE"];
+let PARSED=null;
+
+const log=document.getElementById('log');
+function L(m,c=''){const s=document.createElement('span');s.className=c;s.textContent=m+'\n';log.appendChild(s);log.scrollTop=log.scrollHeight;}
+
+// fecha por defecto = hoy
+document.getElementById('fecha-datos').value=new Date().toISOString().slice(0,10);
+
+function parseCSV(text){
+  const rows=[];let i=0,f='',row=[],q=false;
+  text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  while(i<text.length){const ch=text[i];
+    if(q){if(ch==='"'&&text[i+1]==='"'){f+='"';i+=2;continue;}if(ch==='"'){q=false;i++;continue;}f+=ch;i++;continue;}
+    if(ch==='"'){q=true;i++;continue;}
+    if(ch===','){row.push(f);f='';i++;continue;}
+    if(ch==='\n'){row.push(f);rows.push(row);row=[];f='';i++;continue;}
+    f+=ch;i++;}
+  if(f.length||row.length){row.push(f);rows.push(row);}
+  return rows.filter(r=>r.length>1||(r.length===1&&r[0].trim()));
+}
+
+// suma días [desde, desde+n) de un array (día 1 = índice 0 = más reciente)
+function sumaDias(arr,desde,n){let t=0;for(let k=0;k<n;k++){const v=arr[desde+k];if(v)t+=v;}return t;}
+
+function handle(text){
+  log.classList.remove('hidden');document.getElementById('summary').classList.remove('hidden');
+  document.getElementById('step4').classList.remove('hidden');
+  log.innerHTML='';
+  const rows=parseCSV(text);
+  if(rows.length<2){L('Archivo sin datos.','err');return;}
+  const head=rows[0].map(h=>h.trim());
+  const idx=Object.fromEntries(head.map((h,i)=>[h,i]));
+  // validar columnas de identificación
+  const faltan=COLS_ID.filter(c=>!(c in idx));
+  if(faltan.length){L('Faltan columnas: '+faltan.join(', '),'err');return;}
+  L('✓ Columnas de identificación presentes','ok');
+  // detectar columnas diarias
+  function diasDe(pref){const cs=head.filter(h=>new RegExp('^'+pref+'_(\\d{1,3})$').test(h)).sort((a,b)=>+a.split('_')[1]-+b.split('_')[1]);return cs;}
+  const dVenta=diasDe('DIA'),dDev=diasDe('DEV'),dAju=diasDe('AJU'),dIns=diasDe('INS'),dTra=diasDe('TRA');
+  if(dVenta.length<1){L('No se encontraron columnas de venta diaria (DIA_001…).','err');return;}
+  L('✓ Venta diaria: '+dVenta.length+' días',dVenta.length>=365?'ok':'warn');
+  if(dVenta.length<365)L('  Aviso: hay '+dVenta.length+' días; los periodos mayores quedarán incompletos.','warn');
+  L((dDev.length?'✓':'·')+' Devoluciones: '+dDev.length+' días',dDev.length?'ok':'dim');
+  L((dAju.length?'✓':'·')+' Ajustes: '+dAju.length+' días',dAju.length?'ok':'dim');
+  L((dIns.length?'✓':'·')+' Insumos: '+dIns.length+' días',dIns.length?'ok':'dim');
+  L((dTra.length?'✓':'·')+' Traspasos: '+dTra.length+' días',dTra.length?'ok':'dim');
+
+  const num=(row,c)=>{const v=row[idx[c]];if(v===undefined)return 0;const n=parseFloat(String(v).replace(/[$,\s]/g,''));return isNaN(n)?0:n;};
+  const arrDe=(row,cols)=>cols.map(c=>{const n=parseFloat(String(row[idx[c]]||'').replace(/[$,\s]/g,''));return isNaN(n)?0:n;});
+
+  const data=[];let errs=0;
+  for(let r=1;r<rows.length;r++){
+    const row=rows[r];if(row.every(c=>!String(c).trim()))continue;
+    const clave=String(row[idx['CLAVE']]||'').trim();
+    if(!clave){errs++;continue;}
+    const venta=arrDe(row,dVenta), dev=arrDe(row,dDev), aju=arrDe(row,dAju), ins=arrDe(row,dIns), tra=arrDe(row,dTra);
+    // Pre-agregar los cortes que el cálculo usa: para cada periodo, suma antecedente y pronóstico.
+    // Antecedente: primeros `dias` días (día 1 = más reciente).
+    // Pronóstico: mismos `dias` días pero hace un año -> empieza en día (365 - dias) hacia adelante,
+    //   es decir el mismo tramo estacional del año pasado. Aproximación con el bloque de 365:
+    //   pronóstico = días [365-dias, 365) si hay 365; si no, se reutiliza el disponible.
+    const cortes={};
+    for(const p in PERIODOS){
+      const d=PERIODOS[p];
+      const antVenta=sumaDias(venta,0,d);
+      const antExtra=sumaDias(dev,0,d)+sumaDias(aju,0,d)+sumaDias(ins,0,d)+sumaDias(tra,0,d);
+      // pronóstico: mismo periodo, un año atrás. Inicio = (365 - d) si cabe, sino 0.
+      const ini=Math.max(0, venta.length - d);
+      const proVenta=sumaDias(venta,ini,d);
+      const proExtra=sumaDias(dev,ini,d)+sumaDias(aju,ini,d)+sumaDias(ins,ini,d)+sumaDias(tra,ini,d);
+      cortes[p]={av:antVenta,ax:antExtra,pv:proVenta,px:proExtra};
+    }
+    // venta del mes en curso (para Meses Inv Acumulado): suma de los días transcurridos del mes
+    const diasTransc=parseInt(document.getElementById('dias-transc').value)||14;
+    const vtaMesAcum=sumaDias(venta,0,diasTransc);
+    data.push({
+      id:clave.toUpperCase(),
+      desc:row[idx['DESCRIPCION']]||'',marca:row[idx['MARCA']]||'',grupo:row[idx['GRUPO']]||'',comprador:row[idx['COMPRADOR']]||'',
+      teDias:num(row,'TIEMPO_ENTREGA_DIAS')||30,objetivo:num(row,'MESES_OBJETIVO')||2,
+      empaque:Math.max(1,num(row,'PZS_EMPAQUE')||1),costo:num(row,'COSTO_UNITARIO'),
+      existSV:num(row,'EXIST_SANVER'),bo:num(row,'BO_SANVER'),transito:num(row,'TRANSITO_SANVER'),
+      existMF:num(row,'EXIST_MASFERRE'),baseMF:num(row,'BASE_MASFERRE'),ventaMF:num(row,'VENTA_MENSUAL_MASFERRE'),
+      cortes, vtaMesAcum,
+    });
+  }
+  L('✓ '+data.length+' claves procesadas'+(errs?' ('+errs+' sin clave omitidas)':''),'ok');
+  document.getElementById('summary').innerHTML=`
+    <div class="scell"><div class="l">Claves</div><div class="v">${data.length}</div></div>
+    <div class="scell"><div class="l">Días de venta</div><div class="v">${dVenta.length}</div></div>
+    <div class="scell"><div class="l">Con ajustes</div><div class="v">${(dDev.length||dAju.length||dIns.length||dTra.length)?'Sí':'No'}</div></div>`;
+  PARSED={fecha:document.getElementById('fecha-datos').value,diasTransc:parseInt(document.getElementById('dias-transc').value)||14,claves:data};
+  document.getElementById('btn-gen').disabled=false;
+  L('\nListo. Genera el archivo en el paso 4.','ok');
+}
+
+document.getElementById('btn-gen').onclick=()=>{
+  if(!PARSED)return;
+  const js='// Datos de surtimiento (cálculo exacto) '+PARSED.fecha+' · '+PARSED.claves.length+' claves\n'
+    +'window.DATOS_SURTIMIENTO='+JSON.stringify(PARSED)+';';
+  const a=document.getElementById('btn-dl');
+  a.href=URL.createObjectURL(new Blob([js],{type:'text/javascript'}));
+  a.classList.remove('hidden');
+  L('\n✓ Archivo generado. Descárgalo y súbelo junto a la app.','ok');
+};
+
+const drop=document.getElementById('drop'),file=document.getElementById('file');
+drop.onclick=()=>file.click();
+file.onchange=e=>{const f=e.target.files[0];if(f){const rd=new FileReader();rd.onload=()=>handle(rd.result);rd.readAsText(f);}};
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f){const rd=new FileReader();rd.onload=()=>handle(rd.result);rd.readAsText(f);}});
+</script>
+</body>
+</html>
