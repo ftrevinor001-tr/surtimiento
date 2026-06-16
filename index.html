@@ -241,11 +241,12 @@ function buildOne(id){
   const ventaDiaria=base/30;
   const estacPron=0.8+rnd()*0.5;   // el pronóstico difiere algo del antecedente
   const cortes={};
+  const ventaAnualDemo=Math.round(ventaDiaria*365);
   for(const p in DIAS){
     const d=DIAS[p];
     const av=Math.round(ventaDiaria*d*(0.85+rnd()*0.3));
     const pv=Math.round(av*estacPron);
-    cortes[p]={av, ax:Math.round(av*0.05), pv, px:Math.round(pv*0.05)};
+    cortes[p]={av, ax:Math.round(av*0.05), pv, px:Math.round(pv*0.05), pAnual:ventaAnualDemo};
   }
   const diasTransc=14;
   return {
@@ -331,18 +332,18 @@ function calcular(r,P){
   const BO=r.bo, SV=r.existSV, MF=r.existMF;
   const numBase = (considerarBO?BO:0) + SV + MF;   // SUMA(R,S,AC) ó SUMA(S,AC)
 
-  // venta diaria promedio del periodo (pronóstico / antecedente).
-  // Si AIT: la venta divisora incluye dev+ajustes+insumos+traspasos.
-  const vtaPronTot = c.pv + (ait? c.px : 0);
-  const vtaAntecTot= c.av + (ait? c.ax : 0);
-  const vtaPronDiaria = vtaPronTot/dias;
-  const vtaAntecDiaria= vtaAntecTot/dias;
-
-  // Pron / Antec = meses de inventario con cada base
+  // Pron / Antec = meses de inventario (VALIDADO con datos reales del Excel):
+  //   meses = numBase / venta_mensual_promedio
+  //   Pron: venta mensual = suma de las ventas del AÑO (365 días) / 12.
+  //   Antec: venta mensual = suma del tramo reciente del periodo / meses del periodo.
+  //   (c.pAnual = venta anual; c.av = venta del antecedente del periodo)
   const INF=99;
-  const pron  = vtaPronDiaria>0 ? numBase*dias/(vtaPronDiaria*30*dias) : (numBase>0?INF:0);
-  const antec = vtaAntecDiaria>0? numBase*dias/(vtaAntecDiaria*30*dias): (numBase>0?INF:0);
-  // nota: numBase*dias/(vtaDiaria*30*dias) = numBase/(vtaDiaria*30) -> meses
+  const ventaMensualPron  = (c.pAnual||0)/12;                 // promedio anual
+  const ventaMensualAntec = (c.av||0)/(dias/30);              // tramo reciente del periodo
+  const pron  = ventaMensualPron>0  ? numBase/ventaMensualPron  : (numBase>0?INF:0);
+  const antec = ventaMensualAntec>0 ? numBase/ventaMensualAntec : (numBase>0?INF:0);
+  const vtaPronTot = c.pAnual||0;     // para el sugerido
+  const vtaAntecTot= c.av||0;
   // (se deja la forma larga para reflejar la fórmula original)
 
   const mesesInv = P.base==='antec'? antec : P.base==='pron'? pron : (antec+pron)/2;
@@ -363,8 +364,10 @@ function calcular(r,P){
   if(r.override!=null) sugerido=r.override;
 
   // demanda mensual implícita (para meses proyectados): venta diaria * 30
-  const vtaDiariaUsada = P.base==='antec'? vtaAntecDiaria : P.base==='pron'? vtaPronDiaria : (vtaPronDiaria+vtaAntecDiaria)/2;
-  const demandaMes = vtaDiariaUsada*30;
+  // demanda mensual = VtaTotal del periodo / meses del periodo
+  const mesesPeriodo = dias/30;
+  const vtaTotUsada = P.base==='antec'? vtaAntecTot : P.base==='pron'? vtaPronTot : (vtaPronTot+vtaAntecTot)/2;
+  const demandaMes = mesesPeriodo>0 ? vtaTotUsada/mesesPeriodo : 0;
 
   // proyección: meses de inventario tras recibir el pedido
   const mesesSVproj = demandaMes>0 ? (SV+sugerido)/demandaMes : ((SV+sugerido)>0?INF:0);
