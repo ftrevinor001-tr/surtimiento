@@ -6,12 +6,13 @@
 <title>Surtimiento · Análisis de compra</title>
 <style>
   :root{
-    --bg:#0f1115; --panel:#161a21; --panel2:#1c222b; --line:#262d38;
-    --ink:#e7ecf3; --ink-dim:#9aa6b6; --ink-faint:#697585;
-    --accent:#3ad29f; --accent-dim:#1c6e54;
-    --warn:#f0b429; --bad:#f06363; --good:#3ad29f; --buy:#ffd166; --mf:#7aa2f7;
-    --mono:'SF Mono',ui-monospace,'Cascadia Mono','Roboto Mono',Menlo,Consolas,monospace;
-    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    /* Tema claro estilo Windows 11 / Fluent */
+    --bg:#f3f3f3; --panel:#ffffff; --panel2:#f7f7f9; --line:#e2e2e6;
+    --ink:#1b1b1f; --ink-dim:#5d5d63; --ink-faint:#9a9aa0;
+    --accent:#0067c0; --accent-dim:#cfe4f7;
+    --warn:#9d5d00; --bad:#c42b1c; --good:#0f7b0f; --buy:#8a6d00; --mf:#0067c0;
+    --mono:'Cascadia Mono','SF Mono',ui-monospace,'Roboto Mono',Menlo,Consolas,monospace;
+    --sans:'Segoe UI',-apple-system,BlinkMacSystemFont,Inter,Roboto,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
@@ -49,26 +50,26 @@
   .search input{padding-left:30px}
   .search svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);opacity:.5}
   .count{font-size:11px;color:var(--ink-dim);margin-left:auto}
-  .btn{background:var(--accent);color:#05231a;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  .btn{background:var(--accent);color:#ffffff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)}
   .btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
   .table-wrap{flex:1;overflow:auto;min-height:0}
   table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px}
   thead th{position:sticky;top:0;z-index:3;background:var(--panel2);color:var(--ink-dim);font-weight:600;text-align:right;padding:7px 10px;white-space:nowrap;border-bottom:1px solid var(--line);font-size:10px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none}
   thead th.l{text-align:left}
-  thead th.grp{text-align:center;font-size:9px;border-bottom:1px solid var(--line);background:#11151b;color:var(--ink-faint)}
+  thead th.grp{text-align:center;font-size:9px;border-bottom:1px solid var(--line);background:#eef0f3;color:var(--ink-faint)}
   thead th.sv{color:var(--accent)}thead th.mf{color:var(--mf)}
   thead th:hover{color:var(--ink)}
   thead th .arr{opacity:.4;font-size:9px;margin-left:2px}
-  tbody td{padding:6px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid #1b212a;font-family:var(--mono);font-size:12px}
+  tbody td{padding:6px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid #eef0f3;font-family:var(--mono);font-size:12px}
   tbody td.l{text-align:left;font-family:var(--sans)}
-  tbody tr:hover{background:#191f28}
+  tbody tr:hover{background:#f0f6fc}
   .id{color:var(--ink-dim);font-size:11px}
   .desc{max-width:230px;overflow:hidden;text-overflow:ellipsis}
   .desc .brand{color:var(--ink-faint);font-size:10px;margin-top:1px;display:block}
   .mi-bar{display:inline-flex;align-items:center;gap:5px;justify-content:flex-end}
-  .mi-track{width:34px;height:5px;border-radius:3px;background:#2a323e;overflow:hidden}
+  .mi-track{width:34px;height:5px;border-radius:3px;background:#d8d8dd;overflow:hidden}
   .mi-fill{height:100%;border-radius:3px}
-  .sug-in{width:64px;background:#202a36;border:1px solid var(--accent-dim);color:var(--buy);border-radius:5px;padding:4px 6px;font-size:12px;font-family:var(--mono);text-align:right;font-weight:700}
+  .sug-in{width:64px;background:#eef4fb;border:1px solid var(--accent-dim);color:var(--buy);border-radius:5px;padding:4px 6px;font-size:12px;font-family:var(--mono);text-align:right;font-weight:700}
   .sug-in:focus{outline:none;border-color:var(--accent)}
   .inv{color:var(--accent)}.mfcol{color:var(--mf)}
   td.zero{color:var(--ink-faint)}
@@ -79,7 +80,7 @@
   .empty b{color:var(--ink-dim);font-weight:600;font-size:14px}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:15}
   .overlay.on{opacity:1;pointer-events:auto}
-  .drawer{position:fixed;top:0;right:-460px;width:460px;height:100%;background:var(--panel);border-left:1px solid var(--line);transition:right .22s cubic-bezier(.4,0,.2,1);z-index:20;overflow-y:auto;box-shadow:-12px 0 40px rgba(0,0,0,.4)}
+  .drawer{position:fixed;top:0;right:-460px;width:460px;height:100%;background:var(--panel);border-left:1px solid var(--line);transition:right .22s cubic-bezier(.4,0,.2,1);z-index:20;overflow-y:auto;box-shadow:-8px 0 32px rgba(0,0,0,.12)}
   .drawer.open{right:0}
   .drawer-head{padding:18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2}
   .drawer-head .x{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--ink-dim);font-size:20px;cursor:pointer}
@@ -90,12 +91,12 @@
   .dcell{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
   .dcell .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint)}
   .dcell .v{font-family:var(--mono);font-size:16px;font-weight:600;margin-top:2px}
-  .calc-step{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #1b212a;font-size:12px}
+  .calc-step{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #eef0f3;font-size:12px}
   .calc-step .lbl{color:var(--ink-dim)}.calc-step .v{font-family:var(--mono)}
   .calc-step.total{border-bottom:none;border-top:1px solid var(--line);margin-top:4px;padding-top:10px;font-weight:700}
   .calc-step.total .v{color:var(--buy);font-size:15px}
   .spark{display:flex;align-items:flex-end;gap:2px;height:46px;margin:8px 0 4px}
-  .spark .b{flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#2a323e}
+  .spark .b{flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#d8d8dd}
   .spark .b.pron{background:var(--mf)}
   .spark .b.ant{background:var(--accent)}
   .drawer h4{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);margin:18px 0 8px}
@@ -103,7 +104,7 @@
   .legend i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
   .note{font-size:11px;color:var(--ink-faint);padding:7px 10px;background:var(--panel2);border-radius:6px;border:1px solid var(--line);margin-top:14px;line-height:1.5}
   ::-webkit-scrollbar{width:10px;height:10px}
-  ::-webkit-scrollbar-thumb{background:#2a323e;border-radius:5px;border:2px solid var(--panel)}
+  ::-webkit-scrollbar-thumb{background:#d8d8dd;border-radius:5px;border:2px solid var(--panel)}
   ::-webkit-scrollbar-track{background:transparent}
 </style>
 <!-- Archivo de datos generado por el convertidor. Si no existe, la app entra en MODO DEMO.
@@ -135,10 +136,15 @@
         <option value="1">1 mes</option>
         <option value="1.5">1.5 meses</option>
         <option value="2">2 meses</option>
-        <option value="3" selected>3 meses</option>
+        <option value="3">3 meses</option>
         <option value="4">4 meses</option>
+        <option value="5" selected>5 meses</option>
         <option value="6">6 meses</option>
+        <option value="7">7 meses</option>
+        <option value="8">8 meses</option>
         <option value="9">9 meses</option>
+        <option value="10">10 meses</option>
+        <option value="11">11 meses</option>
         <option value="12">12 meses</option>
       </select>
     </div>
@@ -381,7 +387,7 @@ function calcular(r,P){
 }
 
 // ===================== ESTADO =====================
-const S={base:'pron',periodo:3,bo:true,mf:true,redondeo:true,search:'',
+const S={base:'pron',periodo:5,bo:true,mf:true,redondeo:true,search:'',
   sort:{key:'mesesSV',dir:1},lista:[]};
 function params(){return{base:S.base,periodo:S.periodo,bo:S.bo,mf:S.mf,redondeo:S.redondeo};}
 
@@ -424,7 +430,7 @@ const COLS=[
 const fmt=(n,d=0)=>n.toLocaleString('es-MX',{minimumFractionDigits:d,maximumFractionDigits:d});
 const money=n=>'$'+n.toLocaleString('es-MX',{maximumFractionDigits:0});
 const miN=m=>m>=99?'∞':fmt(m,1);
-function miColor(m){if(m<1)return'#f06363';if(m<2)return'#f0b429';if(m<=4)return'#3ad29f';return'#6b7686';}
+function miColor(m){if(m<1)return'#c42b1c';if(m<2)return'#9d5d00';if(m<=4)return'#0f7b0f';return'#9a9aa0';}
 
 function renderHead(){
   // grupos
@@ -567,11 +573,11 @@ function parseClaves(txt){
 document.getElementById('btn-cargar').onclick=()=>{S.lista=parseClaves(document.getElementById('claves').value);render();};
 document.getElementById('btn-limpiar').onclick=()=>{
   // limpia lista, resultados y todos los filtros/parámetros a su valor inicial
-  S.lista=[];S.search='';S.base='pron';S.periodo=3;S.bo=true;S.mf=true;S.redondeo=true;
+  S.lista=[];S.search='';S.base='pron';S.periodo=5;S.bo=true;S.mf=true;S.redondeo=true;
   S.sort={key:'mesesSV',dir:1};
   document.getElementById('claves').value='';
   document.getElementById('search').value='';
-  document.getElementById('p-periodo').value='3';
+  document.getElementById('p-periodo').value='5';
   document.getElementById('p-bo').checked=true;
   document.getElementById('p-mf').checked=true;
   document.getElementById('p-redondeo').checked=true;
